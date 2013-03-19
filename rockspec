@@ -20,6 +20,18 @@ function PerPlatform:when (plat)
     return self
 end
 
+function PerPlatform:otherwise(plat)
+    self:set_platform(plat)
+    self.no_master = true
+    return self
+end
+
+function PerPlatform:clean()
+    --pretty.dump(self)
+    
+    self.root['modules'] = nil
+end
+
 function PerPlatform:get_platform ()
     return self._plat
 end
@@ -145,17 +157,13 @@ function ModuleGen:__call (args)
         key =  key .. '.' .. self.package
     end
     local kind = self.kind
-    if args == nil then
-        return self.kind(key) --,key..'.'..kind.extension
-    end
-    if args:match '%*' then -- wildcard
+    if args and args:match '%*' then -- wildcard
         local files = dir.getfiles(kind.dir,args..'.'..kind.extension)
         for _,f in ipairs(files) do
-            print (key,f)
             kind(key,f)
         end
     else
-        return self.kind(key,args)
+        return kind(key,args)
     end
 end
 
@@ -412,6 +420,10 @@ function rockspec.write()
     defs.email = defs.email or git_defs.email or "you@your.org"
     defs.homepage = defs.homepage or "http://"..package_name..'.org'
     defs.license = defs.license or "MIT/X11"
+    
+    if build.no_master then
+        print 'yikes!'
+    end
 
     utils.writefile(rockspec_name,template.substitute(rockspec_template,_G))
 
@@ -508,7 +520,7 @@ else
         lapp.quit 'please provide a specfile or either -s or -m'
     end
 end
-if build.modules then
+if build.modules or build.platforms then
     build.type = 'builtin'
 else
     build.type = 'none'
