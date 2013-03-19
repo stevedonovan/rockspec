@@ -202,7 +202,7 @@ end
 
 C = {
     module = cfactory,
-    directory = set_directory(CModule,'src')
+    directory = set_directory(CModule,'.')
 }
 
 Lua = {
@@ -362,7 +362,8 @@ package = "$(package_name)"
 version = "$(package_version)-$(rockspec_version)"
 
 source = {
-  url = "$(URL)"
+  url = "$(URL)",
+  $(BRANCH)
 }
 
 description = {
@@ -403,6 +404,7 @@ function rockspec.write()
 
     if git_defs.url then
         URL = git_defs.url
+        BRANCH = 'tag="'..package_version..'"'
     else
         URL = defs.site..'/'..package_fullname..'.tar.gz'
     end
@@ -414,6 +416,7 @@ function rockspec.write()
     utils.writefile(rockspec_name,template.substitute(rockspec_template,_G))
 
     print(rockspec_name)
+    return rockspec_name
 end
 
 package = define_package
@@ -446,6 +449,8 @@ rockspec [flags] spec-script
     -d,--depends (default '') list of dependencies
     -s,--script  (default '') script to be installed
     -m,--module  (default '') Lua module(s) to be installed; can be a dir
+    -c,--cmodule (default '') C files to be compiled as a Lua extension
+    --make invoke 'luarocks make --local' afterwards
     -g,--git   get Git config data for user and repo information
     -v,--version (default '1.0') Version of package
     -b,--build dump out build section
@@ -454,9 +459,9 @@ rockspec [flags] spec-script
 local specfile = args[1]
 --pretty.dump(args)
 if specfile and args.module == '' then
-    local ok = pcall(dofile,specfile)
+    local ok,err = pcall(dofile,specfile)
     if not ok then
-        lapp.quit('specfile does not exist')
+        lapp.quit('specfile error '..err)
     end
     if not (package_name and package_version) then
         package_name, package_version = parse_filename(specfile)
@@ -494,6 +499,10 @@ else
                 L[m]()
             end
         end
+    elseif args.cmodule ~= '' then
+        local C = C.module
+        package_name = args.cmodule
+        C[args.cmodule]()    
     end
     if not package_name then
         lapp.quit 'please provide a specfile or either -s or -m'
@@ -507,7 +516,10 @@ end
 if args.build then
     print(pretty.write(build))
 else
-    rockspec.write()
+    local rspec = rockspec.write()
+    if args.make then
+        os.execute('luarocks make --local '..rspec)
+    end
 end
 
 
