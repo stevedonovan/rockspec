@@ -6,6 +6,7 @@ local List = require 'pl.List'
 local stringx = require 'pl.stringx'
 
 class.PerPlatform()
+PerPlatform.instances = List()
 
 function PerPlatform:_init(root,vtype,key,base)
     self.root = root
@@ -13,6 +14,7 @@ function PerPlatform:_init(root,vtype,key,base)
     self.key = key
     self.basename = base
     self:set_platform(nil)
+    PerPlatform.instances:append(self)
 end
 
 function PerPlatform:when (plat)
@@ -27,9 +29,9 @@ function PerPlatform:otherwise(plat)
 end
 
 function PerPlatform:clean()
-    --pretty.dump(self)
-    
-    self.root['modules'] = nil
+    if self.basename then
+        self.root[self.basename] = nil
+    end
 end
 
 function PerPlatform:get_platform ()
@@ -91,9 +93,11 @@ end
 build,dependencies,external_dependencies, platforms = {},{},{},{}
 
 class.Module(PerPlatform)
+Module.modules = List()
 
 function Module:_init (name,vtype)
     PerPlatform._init(self,build,vtype,name,'modules')
+    Module.modules:append(self)
 end
 
 local function default_name (name,ext)
@@ -520,7 +524,10 @@ else
         lapp.quit 'please provide a specfile or either -s or -m'
     end
 end
-if build.modules or build.platforms then
+for pp in PerPlatform.instances:iter() do
+    if pp.no_master then pp:clean() end
+end
+if #Module.modules > 0 then
     build.type = 'builtin'
 else
     build.type = 'none'
